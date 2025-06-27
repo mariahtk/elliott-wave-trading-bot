@@ -1,8 +1,18 @@
 import threading
 import time
+import asyncio
 from ib_insync import *
 import pandas as pd
 from scipy.signal import find_peaks
+
+# Helper to ensure asyncio event loop exists in any thread
+def ensure_event_loop():
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
 
 class ElliottWaveBot:
     def __init__(self, symbol='AAPL', exchange='SMART', currency='USD', client_id=1):
@@ -20,6 +30,7 @@ class ElliottWaveBot:
 
     def connect(self):
         if not self.ib_connected:
+            ensure_event_loop()  # Ensure event loop before connecting
             self.ib.connect('127.0.0.1', 7497, clientId=self.client_id)  # 7497 paper trading port
             self.ib.qualifyContracts(self.contract)
             self.ib_connected = True
@@ -74,6 +85,7 @@ class ElliottWaveBot:
         return False
 
     def _auto_trade_loop(self, interval_seconds=300):
+        ensure_event_loop()  # Ensure event loop in this thread
         self.connect()
         print(f"Started auto-trading for {self.symbol}")
 
