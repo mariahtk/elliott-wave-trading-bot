@@ -2,3 +2,4 @@ ib_insync
 pandas
 scipy
 streamlit
+matplotlib
