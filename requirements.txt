@@ -1,7 +1,4 @@
-streamlit
-yfinance
-numpy
+ib_insync
 pandas
-matplotlib
 scipy
-alpaca-py
+streamlit
