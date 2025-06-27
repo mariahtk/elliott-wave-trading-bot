@@ -44,111 +44,46 @@ class ElliottWaveBot:
             self.ib.disconnect()
             self.ib_connected = False
 
-    def get_historical_data(self, duration='1 D', bar_size='5 mins'):
-        bars = self.ib.reqHistoricalData(
-            self.contract,
-            endDateTime='',
-            durationStr=duration,
-            barSizeSetting=bar_size,
-            whatToShow='MIDPOINT',
-            useRTH=True,
-            formatDate=1)
-        df = util.df(bars)
-        return df
-
-    def detect_waves(self, prices):
-        peaks, _ = find_peaks(prices, distance=5)
-        troughs, _ = find_peaks(-prices, distance=5)
-        return peaks, troughs
-
-    def check_buy_signal(self, df):
-        prices = df['close'].values
-        peaks, troughs = self.detect_waves(prices)
-
-        if len(troughs) == 0 or len(peaks) == 0:
-            return False
-
-        last_peak = peaks[-1]
-        last_trough = troughs[-1]
-
-        # Buy logic: last trough after last peak, price currently above last trough
-        if last_trough > last_peak and prices[-1] > prices[last_trough]:
-            return True
-        return False
-
     def place_order(self, action='BUY', quantity=10):
         order = MarketOrder(action, quantity)
         trade = self.ib.placeOrder(self.contract, order)
         return trade
 
-    def check_position(self):
-        positions = self.ib.positions()
-        for pos in positions:
-            if pos.contract.symbol == self.symbol:
-                return pos.position > 0
-        return False
-
-    def _auto_trade_loop(self, interval_seconds=300):
-        ensure_event_loop()  # Ensure event loop in this thread
-        self.connect()
-        print(f"Started auto-trading for {self.symbol}")
-
-        while not self._stop_event.is_set():
-            try:
-                df = self.get_historical_data()
-                buy_signal = self.check_buy_signal(df)
-                self.position_open = self.check_position()
-
-                if buy_signal and not self.position_open and not self.last_signal:
-                    print("Buy signal detected - placing order")
-                    trade = self.place_order('BUY', 10)
-                    print(f"Order status: {trade.orderStatus.status}")
-                    self.last_signal = True
-                    self.position_open = True
-                elif not buy_signal:
-                    self.last_signal = False
-
-            except Exception as e:
-                print(f"Error in auto trade loop: {e}")
-
-            for _ in range(interval_seconds):
-                if self._stop_event.is_set():
-                    break
-                time.sleep(1)
-
-        self.disconnect()
-        print("Auto trading stopped.")
-
+    # Placeholder for your auto trade methods
     def start_auto_trade(self, interval_seconds=300):
-        if self._thread and self._thread.is_alive():
-            print("Auto trade already running")
-            return
-
-        self._stop_event.clear()
-        self._thread = threading.Thread(target=self._auto_trade_loop, args=(interval_seconds,), daemon=True)
-        self._thread.start()
+        pass
 
     def stop_auto_trade(self):
-        if self._thread and self._thread.is_alive():
-            self._stop_event.set()
-            self._thread.join()
-
-# ========== Streamlit UI ==========
-
-st.title("Elliott Wave IBKR Trading Bot")
+        pass
 
 bot = ElliottWaveBot()
 
-ticker = st.text_input("Enter ticker symbol", value="AAPL").upper()
-interval = st.number_input("Auto trade interval (seconds)", min_value=10, value=300)
-qty = st.number_input("Order quantity", min_value=1, value=10)
+st.title("Elliott Wave IBKR Trading Bot")
 
-if st.button("Start Auto Trading"):
-    bot.symbol = ticker
-    bot.contract = Stock(bot.symbol, bot.exchange, bot.currency)
-    bot.start_auto_trade(interval_seconds=interval)
-    st.success(f"Started auto trading for {ticker}")
+# Connect button
+if st.button("Connect to IBKR"):
+    try:
+        bot.connect()
+        st.success("Connected to IBKR")
+        accounts = bot.ib.accounts()
+        st.write("Available accounts:", accounts)
+    except Exception as e:
+        st.error(f"Failed to connect: {e}")
 
-if st.button("Stop Auto Trading"):
-    bot.stop_auto_trade()
-    st.warning("Auto trading stopped")
+st.header("Manual Order Test")
+
+test_symbol = st.text_input("Ticker Symbol", value="AAPL").upper()
+test_action = st.selectbox("Action", options=["BUY", "SELL"])
+test_qty = st.number_input("Quantity", min_value=1, value=1)
+
+if st.button("Place Market Order"):
+    try:
+        bot.symbol = test_symbol
+        bot.contract = Stock(bot.symbol, bot.exchange, bot.currency)
+        if not bot.ib_connected:
+            bot.connect()
+        trade = bot.place_order(test_action, int(test_qty))
+        st.success(f"Placed {test_action} order for {test_qty} shares of {test_symbol}")
+        st.write(f"Order Status: {trade.orderStatus.status}")
+    except Exception as e:
+        st.error(f"Failed to place order: {e}")
