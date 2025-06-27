@@ -1,9 +1,13 @@
 import threading
 import time
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()
+
 from ib_insync import *
 import pandas as pd
 from scipy.signal import find_peaks
+import streamlit as st
 
 # Helper to ensure asyncio event loop exists in any thread
 def ensure_event_loop():
@@ -128,3 +132,23 @@ class ElliottWaveBot:
         if self._thread and self._thread.is_alive():
             self._stop_event.set()
             self._thread.join()
+
+# ========== Streamlit UI ==========
+
+st.title("Elliott Wave IBKR Trading Bot")
+
+bot = ElliottWaveBot()
+
+ticker = st.text_input("Enter ticker symbol", value="AAPL").upper()
+interval = st.number_input("Auto trade interval (seconds)", min_value=10, value=300)
+qty = st.number_input("Order quantity", min_value=1, value=10)
+
+if st.button("Start Auto Trading"):
+    bot.symbol = ticker
+    bot.contract = Stock(bot.symbol, bot.exchange, bot.currency)
+    bot.start_auto_trade(interval_seconds=interval)
+    st.success(f"Started auto trading for {ticker}")
+
+if st.button("Stop Auto Trading"):
+    bot.stop_auto_trade()
+    st.warning("Auto trading stopped")
